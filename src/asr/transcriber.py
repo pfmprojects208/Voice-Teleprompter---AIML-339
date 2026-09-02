@@ -34,7 +34,7 @@ class Transcriber:
                 if len(buffer) >= self.window_size:
                     window, buffer = buffer[:self.window_size], buffer[self.window_size:]
                     segments, _ = self.model.transcribe(window, language="en",
-                                                        beam_size=1, vad_filter=True)
+                                                        beam_size=1, vad_filter=False)
                     text = " ".join(s.text.strip() for s in segments)
                     if text:
                         yield text
