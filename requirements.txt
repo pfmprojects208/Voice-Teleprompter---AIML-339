@@ -3,3 +3,5 @@ sentence-transformers
 rapidfuzz
 scikit-learn
 websockets
+sounddevice
+numpy
