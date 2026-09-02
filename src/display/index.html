@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Voice Teleprompter</title>
+  <style>
+    body {
+      background: #000;
+      color: #fff;
+      font-family: Georgia, serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+    #chunk {
+      font-size: 3rem;
+      text-align: center;
+      max-width: 80%;
+      line-height: 1.4;
+    }
+    #meta {
+      margin-top: 2rem;
+      font-size: 1rem;
+      color: #555;
+    }
+    #status {
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      font-size: 0.8rem;
+      color: #444;
+    }
+  </style>
+</head>
+<body>
+  <div id="status">Connecting...</div>
+  <div id="chunk">Waiting for speech...</div>
+  <div id="meta"></div>
+
+  <script>
+    const chunkEl = document.getElementById("chunk");
+    const metaEl = document.getElementById("meta");
+    const statusEl = document.getElementById("status");
+
+    function connect() {
+      const ws = new WebSocket("ws://localhost:8765");
+
+      ws.onopen = () => {
+        statusEl.textContent = "Connected";
+      };
+
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        chunkEl.textContent = data.chunk;
+        metaEl.textContent = `chunk ${data.index + 1} · score ${data.score}`;
+      };
+
+      ws.onclose = () => {
+        statusEl.textContent = "Disconnected — retrying...";
+        setTimeout(connect, 2000);
+      };
+    }
+
+    connect();
+  </script>
+</body>
+</html>
