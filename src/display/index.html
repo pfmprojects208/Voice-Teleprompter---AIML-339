@@ -33,10 +33,25 @@
       font-size: 0.8rem;
       color: #444;
     }
+    #model-select {
+      position: fixed;
+      top: 1rem;
+      left: 1rem;
+      background: #111;
+      color: #fff;
+      border: 1px solid #333;
+      font-family: Georgia, serif;
+      font-size: 0.85rem;
+      padding: 0.3rem 0.5rem;
+    }
   </style>
 </head>
 <body>
   <div id="status">Connecting...</div>
+  <select id="model-select">
+    <option value="baseline">B1 — Baseline (lexical)</option>
+    <option value="hybrid">B2 — Hybrid (lexical + semantic)</option>
+  </select>
   <div id="chunk">Waiting for speech...</div>
   <div id="meta"></div>
 
@@ -44,6 +59,7 @@
     const chunkEl = document.getElementById("chunk");
     const metaEl = document.getElementById("meta");
     const statusEl = document.getElementById("status");
+    const modelSelectEl = document.getElementById("model-select");
 
     function connect() {
       const ws = new WebSocket("ws://localhost:8765");
@@ -56,11 +72,20 @@
         const data = JSON.parse(event.data);
         chunkEl.textContent = data.chunk;
         metaEl.textContent = `chunk ${data.index + 1} · score ${data.score}`;
+        if (data.model && modelSelectEl.value !== data.model) {
+          modelSelectEl.value = data.model;
+        }
       };
 
       ws.onclose = () => {
         statusEl.textContent = "Disconnected — retrying...";
         setTimeout(connect, 2000);
+      };
+
+      modelSelectEl.onchange = () => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: "select_model", model: modelSelectEl.value }));
+        }
       };
     }
 
