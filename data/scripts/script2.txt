@@ -1,0 +1,55 @@
+Good morning, everyone, and thank you all for being here today.
+I would like to spend the next few minutes talking about artificial intelligence.
+It is a term we hear constantly, in the news and in everyday conversation.
+But what does it actually mean, and how does it really work?
+At its core, artificial intelligence is about building systems that can learn from data.
+Instead of following a fixed set of rules written by a programmer, these systems adapt.
+They look at many examples, and they gradually improve their own performance over time.
+This approach is often called machine learning, and it sits at the heart of modern AI.
+Let's break this down into a few major categories that you may have heard about.
+The first category is supervised learning, which is probably the most common approach today.
+In supervised learning, a model is trained on labelled examples, like photos tagged with categories.
+Over many repetitions, the model learns to predict the correct label for new, unseen examples.
+The second category is unsupervised learning, where there are no labels provided at all.
+Here, the system tries to find hidden patterns or groupings within the data on its own.
+The third category is reinforcement learning, inspired loosely by how humans and animals learn.
+An agent takes actions in an environment and receives rewards or penalties based on the outcome.
+Over time, it learns a strategy that maximizes its long-term reward.
+This is the same technique used to train systems that can play complex games at a high level.
+Now, you may be wondering why artificial intelligence has become so powerful in recent years.
+Three things came together almost at the same time to make this possible.
+First, we now have access to enormous amounts of digital data to learn from.
+Second, computing hardware, especially graphics processors, became dramatically faster and cheaper.
+Third, researchers developed better algorithms, particularly a family of models called neural networks.
+Neural networks are loosely inspired by the structure of the human brain.
+They consist of layers of simple units that pass information to one another.
+Individually, each unit performs a very simple calculation.
+But when you stack millions of them together, the system can learn remarkably complex behavior.
+This is the technology behind image recognition, translation, and modern voice assistants.
+It is also the technology behind the large language models you may have used yourself.
+Of course, artificial intelligence is not without its risks and its open questions.
+Models can inherit biases that were present in their training data.
+They can also make confident mistakes, which can be difficult to detect in practice.
+There are important questions about privacy, about fairness, and about accountability.
+Who is responsible when an automated system makes a harmful decision?
+These are not just technical questions, they are also deeply social and ethical ones.
+Researchers, companies, and governments are all working, at different speeds, to address them.
+Regulation is beginning to catch up with the pace of technological change.
+Transparency and explainability have become major topics of active research.
+We want systems whose decisions we can actually understand and question.
+Despite these challenges, the potential benefits of artificial intelligence remain enormous.
+In medicine, models can help detect diseases earlier than traditional methods allow.
+In science, they can accelerate discovery by exploring possibilities far faster than humans can.
+In everyday life, they can make technology more accessible to people with disabilities.
+The key, I believe, is not to fear this technology, nor to blindly trust it.
+Instead, we should aim to understand it well enough to use it responsibly.
+That means asking good questions about how systems are built and evaluated.
+It means demanding transparency from the organizations that deploy them at scale.
+And it means remembering that these are tools, built by people, for people.
+As students and future engineers, you are in a unique position.
+You will not just use this technology, many of you will help build it.
+That comes with real responsibility, but also with real opportunity.
+I encourage you to stay curious, stay critical, and keep asking how and why.
+Artificial intelligence will keep evolving quickly over the next decade.
+How it shapes our world will depend, in large part, on the choices we make now.
+Thank you again for your attention, and I look forward to your questions.
