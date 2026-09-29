@@ -216,3 +216,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Raw dataset recordings (real speaker audio - not committed until consent/ethics is settled)
+data/raw/*.wav
