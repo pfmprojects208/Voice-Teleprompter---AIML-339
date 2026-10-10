@@ -1,5 +1,9 @@
+import joblib
+import numpy as np
 from rapidfuzz.fuzz import token_sort_ratio
 from sentence_transformers import SentenceTransformer, util
+
+from evaluation.features import FeatureExtractor
 
 
 class BaselineMatcher:
@@ -27,7 +31,12 @@ class BaselineMatcher:
     def finished(self) -> bool:
         return self._finished
 
-    def update(self, transcript: str) -> tuple[str, float, bool]:
+    def update(
+        self, transcript: str, window_time: float = 0.0, asr_confidence: float = 1.0
+    ) -> tuple[str, float, bool]:
+        """`window_time`/`asr_confidence` are accepted so callers can treat
+        every matcher the same way regardless of which is active; this
+        lexical-only matcher doesn't need them."""
         if self.finished:
             return "", 0.0, False
 
@@ -97,7 +106,12 @@ class HybridMatcher:
     def finished(self) -> bool:
         return self._finished
 
-    def update(self, transcript: str) -> tuple[str, float, bool]:
+    def update(
+        self, transcript: str, window_time: float = 0.0, asr_confidence: float = 1.0
+    ) -> tuple[str, float, bool]:
+        """`window_time`/`asr_confidence` are accepted so callers can treat
+        every matcher the same way regardless of which is active; this
+        matcher doesn't need them."""
         if self.finished:
             return "", 0.0, False
 
@@ -134,3 +148,76 @@ class HybridMatcher:
         self.current_index = 0
         self._finished = False
         self._transcript_history.clear()
+
+
+class ClassifierMatcher:
+    """Advance through script chunks using the trained B3 advance/hold
+    classifier (see `evaluation.train_classifier`).
+
+    Computes the same 8 features the model was trained on via
+    `FeatureExtractor` - fed the chunk pointer this matcher owns itself,
+    mirroring how `evaluation.ground_truth.GroundTruthPointer` drives it
+    during training-data extraction - and advances when the model predicts
+    the advance class.
+    """
+
+    def __init__(
+        self,
+        chunks: list[str],
+        model_path,
+        model_name: str = "all-MiniLM-L6-v2",
+        history_windows: int = 4,
+        rolling_window: int = 3,
+    ):
+        if not chunks:
+            raise ValueError("chunks must contain at least one script segment")
+
+        bundle = joblib.load(model_path)
+        self._model = bundle["model"]
+        self._feature_names = bundle["features"]
+
+        self.chunks = chunks
+        self.current_index = 0
+        self._finished = False
+        self._extractor = FeatureExtractor(
+            chunks, model_name=model_name, history_windows=history_windows,
+            rolling_window=rolling_window,
+        )
+
+    @property
+    def current_chunk(self) -> str:
+        return self.chunks[self.current_index]
+
+    @property
+    def finished(self) -> bool:
+        return self._finished
+
+    def update(
+        self, transcript: str, window_time: float = 0.0, asr_confidence: float = 1.0
+    ) -> tuple[str, float, bool]:
+        if self.finished:
+            return "", 0.0, False
+
+        features = self._extractor.update(
+            transcript, self.current_index, window_time, asr_confidence
+        )
+        feature_vector = np.array(
+            [[getattr(features, name) for name in self._feature_names]]
+        )
+        advance = bool(self._model.predict(feature_vector)[0])
+        score = float(self._model.predict_proba(feature_vector)[0, 1]) * 100
+
+        advanced = False
+        if advance:
+            if self.current_index < len(self.chunks) - 1:
+                self.current_index += 1
+                advanced = True
+            else:
+                self._finished = True
+
+        return self.current_chunk, score, advanced
+
+    def reset(self):
+        self.current_index = 0
+        self._finished = False
+        self._extractor.reset()

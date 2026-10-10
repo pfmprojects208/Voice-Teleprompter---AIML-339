@@ -1,9 +1,13 @@
 import json
+from pathlib import Path
 
 from alignment.chunker import load_chunks
-from alignment.matcher import BaselineMatcher, HybridMatcher
+from alignment.matcher import BaselineMatcher, ClassifierMatcher, HybridMatcher
 from asr.transcriber import Transcriber
 from display.server import DisplayServer
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+CLASSIFIER_MODEL_PATH = REPO_ROOT / "data" / "models" / "b3_classifier.joblib"
 
 
 class MatcherRegistry:
@@ -31,6 +35,11 @@ def run(script_path: str, threshold: float = 70.0):
         "baseline": BaselineMatcher(chunks, threshold=threshold),
         "hybrid": HybridMatcher(chunks, threshold=threshold),
     }
+    if CLASSIFIER_MODEL_PATH.exists():
+        matchers["classifier"] = ClassifierMatcher(chunks, CLASSIFIER_MODEL_PATH)
+    else:
+        print(f"Skipping classifier model: no model found at {CLASSIFIER_MODEL_PATH}")
+
     registry = MatcherRegistry(matchers, default="baseline")
 
     def handle_message(raw_message: str):
@@ -49,12 +58,14 @@ def run(script_path: str, threshold: float = 70.0):
     print("Open src/display/index.html in your browser, then start speaking.\n")
 
     try:
-        for transcript in transcriber.stream():
+        for window in transcriber.stream():
             matcher = registry.active
-            chunk, score, advanced = matcher.update(transcript)
+            chunk, score, advanced = matcher.update(
+                window.text, window.window_time, window.confidence
+            )
             server.send(chunk, matcher.current_index, score, registry.active_name)
             tag = " → ADVANCE" if advanced else ""
-            print(f"[{registry.active_name:8}][{score:5.1f}] {transcript:<60}{tag}")
+            print(f"[{registry.active_name:8}][{score:5.1f}] {window.text:<60}{tag}")
 
             if matcher.finished:
                 print("Script complete.")

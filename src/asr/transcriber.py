@@ -41,7 +41,12 @@ class Transcriber:
         return text, confidence
 
     def stream(self):
+        """Live microphone counterpart to `stream_file()` - same windowing,
+        same `WindowTranscript` shape (text, elapsed window_time, ASR
+        confidence), so a matcher that needs those at inference time (the
+        B3 classifier) sees the same input it was trained on."""
         buffer = np.array([], dtype=np.float32)
+        samples_consumed = 0
 
         with sd.InputStream(samplerate=self.sample_rate, channels=1,
                             dtype="float32", callback=self._audio_callback):
@@ -55,9 +60,14 @@ class Transcriber:
 
                 if len(buffer) >= self.window_size:
                     window, buffer = buffer[:self.window_size], buffer[self.window_size:]
-                    text, _ = self._transcribe_window(window)
+                    samples_consumed += self.window_size
+                    text, confidence = self._transcribe_window(window)
                     if text:
-                        yield text
+                        yield WindowTranscript(
+                            text=text,
+                            window_time=samples_consumed / self.sample_rate,
+                            confidence=confidence,
+                        )
 
     def stream_file(self, audio_path: str):
         """Replays a recorded .wav file through the same window-by-window
