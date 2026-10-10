@@ -2,6 +2,7 @@ faster-whisper
 sentence-transformers
 rapidfuzz
 scikit-learn
+joblib
 websockets
 sounddevice
 numpy
