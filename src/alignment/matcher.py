@@ -159,6 +159,16 @@ class ClassifierMatcher:
     mirroring how `evaluation.ground_truth.GroundTruthPointer` drives it
     during training-data extraction - and advances when the model predicts
     the advance class.
+
+    The model is trained on features computed against the ALWAYS-correct
+    ground-truth index, but at inference this matcher's own (sometimes
+    wrong) index drives those same features - so a single noisy "advance"
+    prediction can desync the index and cascade into more of them. Mitigated
+    with hysteresis (`confirm_windows`): a chunk transition only commits once
+    `confirm_windows` consecutive windows have predicted "advance"; any
+    "hold" in between resets the streak. This doesn't fix the underlying
+    train/inference mismatch, just damps how easily one noisy window can
+    trigger it.
     """
 
     def __init__(
@@ -168,17 +178,22 @@ class ClassifierMatcher:
         model_name: str = "all-MiniLM-L6-v2",
         history_windows: int = 4,
         rolling_window: int = 3,
+        confirm_windows: int = 1,
     ):
         if not chunks:
             raise ValueError("chunks must contain at least one script segment")
+        if confirm_windows < 1:
+            raise ValueError("confirm_windows must be at least 1")
 
         bundle = joblib.load(model_path)
         self._model = bundle["model"]
         self._feature_names = bundle["features"]
 
         self.chunks = chunks
+        self.confirm_windows = confirm_windows
         self.current_index = 0
         self._finished = False
+        self._advance_streak = 0
         self._extractor = FeatureExtractor(
             chunks, model_name=model_name, history_windows=history_windows,
             rolling_window=rolling_window,
@@ -204,11 +219,14 @@ class ClassifierMatcher:
         feature_vector = np.array(
             [[getattr(features, name) for name in self._feature_names]]
         )
-        advance = bool(self._model.predict(feature_vector)[0])
+        predicted_advance = bool(self._model.predict(feature_vector)[0])
         score = float(self._model.predict_proba(feature_vector)[0, 1]) * 100
 
+        self._advance_streak = self._advance_streak + 1 if predicted_advance else 0
+
         advanced = False
-        if advance:
+        if self._advance_streak >= self.confirm_windows:
+            self._advance_streak = 0
             if self.current_index < len(self.chunks) - 1:
                 self.current_index += 1
                 advanced = True
@@ -220,4 +238,5 @@ class ClassifierMatcher:
     def reset(self):
         self.current_index = 0
         self._finished = False
+        self._advance_streak = 0
         self._extractor.reset()

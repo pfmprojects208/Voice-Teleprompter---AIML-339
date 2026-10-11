@@ -155,17 +155,19 @@ def compute_metrics(bucket: Bucket) -> Metrics:
     )
 
 
-def build_matchers(chunks: list[str], threshold: float) -> dict:
+def build_matchers(chunks: list[str], threshold: float, confirm_windows: int) -> dict:
     matchers = {
         "baseline": BaselineMatcher(chunks, threshold=threshold),
         "hybrid": HybridMatcher(chunks, threshold=threshold),
     }
     if CLASSIFIER_MODEL_PATH.exists():
-        matchers["classifier"] = ClassifierMatcher(chunks, CLASSIFIER_MODEL_PATH)
+        matchers["classifier"] = ClassifierMatcher(
+            chunks, CLASSIFIER_MODEL_PATH, confirm_windows=confirm_windows
+        )
     return matchers
 
 
-def run_evaluation(speaker: str, threshold: float) -> dict[str, dict[str, Bucket]]:
+def run_evaluation(speaker: str, threshold: float, confirm_windows: int = 1) -> dict[str, dict[str, Bucket]]:
     """Returns `results[matcher_name][condition]`, pooling recordings
     across all three scripts for that condition."""
     transcriber = Transcriber()
@@ -176,7 +178,7 @@ def run_evaluation(speaker: str, threshold: float) -> dict[str, dict[str, Bucket
 
     for script_num in SCRIPT_NUMBERS:
         chunks = load_chunks(SCRIPTS_DIR / f"script{script_num}.txt")
-        matchers = build_matchers(chunks, threshold)
+        matchers = build_matchers(chunks, threshold, confirm_windows)
 
         for condition in CONDITIONS:
             audio_path = RAW_DIR / f"script{script_num}_speaker{speaker}_{condition}.wav"
@@ -262,10 +264,15 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--speaker", default="A")
     parser.add_argument("--threshold", type=float, default=70.0)
+    parser.add_argument(
+        "--confirm-windows", type=int, default=1,
+        help="consecutive 'advance' predictions the classifier matcher needs before "
+             "committing a chunk transition (hysteresis mitigation for cascading false advances)",
+    )
     parser.add_argument("--out", type=Path, default=REPO_ROOT / "data" / "evaluation" / "results.csv")
     args = parser.parse_args()
 
-    results = run_evaluation(args.speaker, args.threshold)
+    results = run_evaluation(args.speaker, args.threshold, args.confirm_windows)
     print_report(results)
     write_csv(results, args.out)
     print(f"\nsaved -> {args.out}")

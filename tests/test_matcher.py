@@ -221,21 +221,36 @@ class _StubFeatureExtractor:
 
 
 class _StubClassifierModel:
-    """Deterministic stand-in for the trained sklearn pipeline: always
-    predicts the given class and advance-class probability."""
+    """Deterministic stand-in for the trained sklearn pipeline.
 
-    def __init__(self, predict_value: int, proba_advance: float):
+    `predict_value`/`proba_advance` may each be a single value (returned on
+    every call) or a list consumed one-per-call (sticking on the last entry
+    once exhausted), so tests can script a sequence of predictions."""
+
+    def __init__(self, predict_value, proba_advance):
+        self._predict_values = predict_value if isinstance(predict_value, list) else None
+        self._proba_values = proba_advance if isinstance(proba_advance, list) else None
         self.predict_value = predict_value
         self.proba_advance = proba_advance
+        self._call_count = 0
         self.last_X: np.ndarray | None = None
+
+    def _next(self, scripted, fallback):
+        if scripted is None:
+            return fallback
+        index = min(self._call_count, len(scripted) - 1)
+        return scripted[index]
 
     def predict(self, X):
         self.last_X = X
-        return [self.predict_value]
+        value = self._next(self._predict_values, self.predict_value)
+        return [value]
 
     def predict_proba(self, X):
         self.last_X = X
-        return np.array([[1 - self.proba_advance, self.proba_advance]])
+        value = self._next(self._proba_values, self.proba_advance)
+        self._call_count += 1  # predict_proba runs second in ClassifierMatcher.update()
+        return np.array([[1 - value, value]])
 
 
 CLASSIFIER_CHUNKS = ["welcome everyone", "today we explore"]
@@ -243,7 +258,10 @@ CLASSIFIER_CHUNKS = ["welcome everyone", "today we explore"]
 
 @pytest.fixture
 def make_classifier_matcher(monkeypatch):
-    def _make(chunks, predict_value, proba_advance, feature_names=("lexical_current", "asr_confidence")):
+    def _make(
+        chunks, predict_value, proba_advance,
+        feature_names=("lexical_current", "asr_confidence"), confirm_windows=1,
+    ):
         model = _StubClassifierModel(predict_value, proba_advance)
         bundle = {"model": model, "features": list(feature_names)}
         monkeypatch.setattr("src.alignment.matcher.joblib.load", lambda path: bundle)
@@ -257,7 +275,9 @@ def make_classifier_matcher(monkeypatch):
 
         monkeypatch.setattr("src.alignment.matcher.FeatureExtractor", _factory)
 
-        matcher = ClassifierMatcher(chunks, model_path="unused.joblib")
+        matcher = ClassifierMatcher(
+            chunks, model_path="unused.joblib", confirm_windows=confirm_windows
+        )
         return matcher, model, extractors[0]
 
     return _make
@@ -338,3 +358,39 @@ def test_classifier_finished_matcher_returns_empty_without_calling_extractor(mak
 def test_classifier_empty_script_is_rejected():
     with pytest.raises(ValueError, match="at least one"):
         ClassifierMatcher([], model_path="unused.joblib")
+
+
+def test_classifier_rejects_non_positive_confirm_windows():
+    with pytest.raises(ValueError, match="confirm_windows"):
+        ClassifierMatcher(CLASSIFIER_CHUNKS, model_path="unused.joblib", confirm_windows=0)
+
+
+def test_classifier_confirm_windows_withholds_advance_until_streak_reached(make_classifier_matcher):
+    matcher, _, _ = make_classifier_matcher(
+        CLASSIFIER_CHUNKS, predict_value=1, proba_advance=0.9, confirm_windows=2,
+    )
+
+    first_chunk, _, first_advanced = matcher.update("one")
+
+    assert not first_advanced
+    assert first_chunk == "welcome everyone"
+    assert matcher.current_index == 0
+
+    second_chunk, _, second_advanced = matcher.update("two")
+
+    assert second_advanced
+    assert second_chunk == "today we explore"
+    assert matcher.current_index == 1
+
+
+def test_classifier_confirm_windows_streak_resets_on_hold(make_classifier_matcher):
+    matcher, _, _ = make_classifier_matcher(
+        CLASSIFIER_CHUNKS, predict_value=[1, 0, 1], proba_advance=0.9, confirm_windows=2,
+    )
+
+    matcher.update("one")  # advance streak: 1
+    matcher.update("two")  # hold predicted -> streak resets to 0
+    _, _, third_advanced = matcher.update("three")  # advance streak: 1, not yet 2
+
+    assert not third_advanced
+    assert matcher.current_index == 0
