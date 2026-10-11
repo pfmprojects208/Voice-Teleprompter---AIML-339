@@ -6,3 +6,4 @@ joblib
 websockets
 sounddevice
 numpy
+matplotlib
