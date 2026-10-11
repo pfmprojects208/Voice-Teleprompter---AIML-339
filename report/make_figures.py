@@ -17,7 +17,6 @@ import matplotlib.pyplot as plt
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 RESULTS_CSV = REPO_ROOT / "data" / "evaluation" / "results.csv"
-SWEEP_CSV = REPO_ROOT / "data" / "evaluation" / "sweep_results.csv"
 OUT_DIR = Path(__file__).resolve().parent / "figures"
 
 BLUE, ORANGE, AQUA = "#2a78d6", "#eb6834", "#1baf7a"
@@ -80,7 +79,7 @@ def fig_overall(results):
     n_lat = [int(overall[m]["n_latencies_measured"]) for m in methods]
     n_trans = [int(overall[m]["n_transitions"]) for m in methods]
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(7.0, 2.8))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(7.0, 2.3))
 
     x = range(len(methods))
     w = 0.32
@@ -123,7 +122,7 @@ def fig_condition(results):
     far_baseline = [float(by_cond[c]["false_advance_rate"]) * 100 for c in conditions]
     far_classifier = [float(by_cond_cls[c]["false_advance_rate"]) * 100 for c in conditions]
 
-    fig, ax = plt.subplots(figsize=(3.3, 2.5))
+    fig, ax = plt.subplots(figsize=(3.3, 2.1))
     x = range(len(conditions))
     w = 0.32
     b1 = ax.bar([i - w / 2 for i in x], far_baseline, width=w, color=BLUE, label="B1 / B2")
@@ -143,10 +142,10 @@ def fig_condition(results):
 
 def fig_mismatch():
     # Oracle-pointer CV vs. live self-pointer replay, B3 only (Section "Train/inference mismatch").
-    oracle_f1, live_f1 = 0.428, 0.227
+    oracle_f1, live_f1 = 0.428, 0.224
     oracle_far, live_far = 2.3, 11.6
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(3.3, 2.6))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(3.3, 2.2))
     labels = ["Oracle\npointer (CV)", "Live\nself-pointer"]
     colors = [BLUE, ORANGE]
 
@@ -169,42 +168,12 @@ def fig_mismatch():
     plt.close(fig)
 
 
-def fig_confirm_sweep():
-    rows = [r for r in read_rows(SWEEP_CSV) if r["matcher"] == "classifier"]
-    rows.sort(key=lambda r: int(r["value"]))
-    cw = [int(r["value"]) for r in rows]
-    far = [float(r["far"]) * 100 for r in rows]
-    f1 = [float(r["f1"]) for r in rows]
-
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(3.3, 2.6))
-
-    ax1.plot(cw, far, color=ORANGE, marker="o", markersize=5, linewidth=2)
-    ax1.set_xlabel("confirm_windows")
-    ax1.set_ylabel("False-advance rate (%)")
-    ax1.set_xticks(cw)
-    ax1.set_ylim(0, max(far) * 1.25)
-    ax1.set_title("(a) FAR", fontsize=9)
-
-    ax2.plot(cw, f1, color=BLUE, marker="o", markersize=5, linewidth=2)
-    ax2.set_xlabel("confirm_windows")
-    ax2.set_ylabel("F1 (advance class)")
-    ax2.set_xticks(cw)
-    ax2.set_ylim(0, max(f1) * 1.25)
-    ax2.set_title("(b) F1", fontsize=9)
-
-    fig.tight_layout()
-    fig.savefig(OUT_DIR / "fig_confirm_sweep.pdf")
-    plt.close(fig)
-
-
 def main():
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     results = read_rows(RESULTS_CSV)
     fig_overall(results)
     fig_condition(results)
     fig_mismatch()
-    if SWEEP_CSV.exists():
-        fig_confirm_sweep()
     print(f"saved figures -> {OUT_DIR}")
 
 
